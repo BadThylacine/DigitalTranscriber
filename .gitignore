@@ -1,0 +1,21 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+build/
+app/libs/*.aar
+app/src/main/assets/whisper/*.onnx
+app/src/main/assets/whisper/*.txt
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Signing — never commit your release keystore or its passwords
+*.jks
+*.keystore
+keystore.properties
+
+# Built output — you'll attach APKs to GitHub Releases, not commit them
+*.apk
+*.aab
