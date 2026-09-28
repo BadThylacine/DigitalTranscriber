@@ -30,3 +30,11 @@ app cannot send anything off the phone.
 ## Notes
 - To shrink the APK, drop `x86_64` from `abiFilters` in `app/build.gradle.kts`.
 - Only process content you have the right to use.
+
+## Credits
+Built with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0) and
+OpenAI's [Whisper](https://github.com/openai/whisper) (MIT) models. Not affiliated
+with Instagram or Meta.
+
+## License
+MIT — see [LICENSE](LICENSE).
