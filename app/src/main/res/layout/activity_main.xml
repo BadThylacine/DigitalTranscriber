@@ -12,12 +12,34 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <TextView
+            android:id="@+id/modelText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="No model installed"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/manageModelButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Manage model" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
         <Button
             android:id="@+id/pickButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Pick file" />
+            android:text="Pick video" />
 
         <Spinner
             android:id="@+id/languageSpinner"
@@ -62,6 +84,13 @@
         android:layout_height="wrap_content"
         android:enabled="false"
         android:text="Translate to English" />
+
+    <Button
+        android:id="@+id/exportSrtButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:enabled="false"
+        android:text="Export subtitles (.srt)" />
 
     <LinearLayout
         android:layout_width="match_parent"

@@ -1,39 +1,44 @@
 package com.example.offlinetranscriber
 
-import android.content.Context
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
-import kotlin.math.abs
+import java.io.File
+
+/** Thrown when transcribe/translate is called with no model downloaded yet. */
+class NoModelException : Exception("No model is installed. Download one first.")
 
 /**
- * Wraps sherpa-onnx's Whisper recognizer. Whisper handles at most ~30 s per
- * pass, so longer audio is split into <=28 s chunks, cutting at the quietest
- * point near each boundary to avoid slicing through words.
+ * Wraps sherpa-onnx's Whisper recognizer, loading the currently active model
+ * from disk (see ModelManager) by absolute file path -- sherpa-onnx's
+ * no-AssetManager constructor reads straight from the filesystem, which is
+ * what lets models be downloaded in-app instead of baked into the APK.
  */
-class Transcriber(private val context: Context) {
+class Transcriber(private val modelManager: ModelManager) {
 
     private var recognizer: OfflineRecognizer? = null
-    private var loadedKey: String? = null
+    private var loadedKey: String? = null // "<modelId>|<language>|<task>"
 
     /** language: Whisper code such as "en", "de"; empty string = auto-detect. */
     @Synchronized
     private fun recognizerFor(language: String, task: String): OfflineRecognizer {
-        val key = "$language|$task"
+        val active = modelManager.activeModel() ?: throw NoModelException()
+        val key = "${active.id}|$language|$task"
         if (recognizer != null && loadedKey == key) return recognizer!!
         recognizer?.release()
 
+        val dir = active.dir
         val whisper = OfflineWhisperModelConfig(
-            encoder = "whisper/encoder.onnx",
-            decoder = "whisper/decoder.onnx",
+            encoder = File(dir, "encoder.onnx").absolutePath,
+            decoder = File(dir, "decoder.onnx").absolutePath,
             language = language,
             task = task,
         )
         val model = OfflineModelConfig(
             whisper = whisper,
-            tokens = "whisper/tokens.txt",
+            tokens = File(dir, "tokens.txt").absolutePath,
             numThreads = 4,
             debug = false,
             provider = "cpu",
@@ -42,8 +47,8 @@ class Transcriber(private val context: Context) {
             featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
             modelConfig = model,
         )
-        // Passing the AssetManager makes sherpa-onnx read the model straight from the APK.
-        return OfflineRecognizer(assetManager = context.assets, config = config).also {
+        // No assetManager argument -> sherpa-onnx loads the files from the paths above.
+        return OfflineRecognizer(config = config).also {
             recognizer = it
             loadedKey = key
         }
@@ -56,55 +61,53 @@ class Transcriber(private val context: Context) {
         onProgress: (done: Int, total: Int) -> Unit,
         isCancelled: () -> Boolean = { false },
     ): String {
+        val chunks = AudioChunker.chunks(pcm.samples, pcm.sampleRate)
+        return transcribeChunks(pcm, language, task, chunks, onProgress, isCancelled)
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
+    }
+
+    /**
+     * Same as [transcribe] but returns one (possibly empty) string per chunk in
+     * [chunks], instead of joining them. Used for subtitle export, where each
+     * chunk becomes one timed cue -- and where calling this with the *same*
+     * [chunks] list for both "transcribe" and "translate" is what keeps
+     * bilingual subtitle lines aligned in time.
+     */
+    fun transcribeChunks(
+        pcm: Pcm,
+        language: String,
+        task: String,
+        chunks: List<AudioChunk>,
+        onProgress: (done: Int, total: Int) -> Unit,
+        isCancelled: () -> Boolean = { false },
+    ): List<String> {
         val rec = recognizerFor(language, task)
-        val chunks = split(pcm.samples, pcm.sampleRate)
-        val parts = ArrayList<String>()
-        chunks.forEachIndexed { i, (start, end) ->
+        val texts = ArrayList<String>(chunks.size)
+        chunks.forEachIndexed { i, c ->
             if (isCancelled()) throw InterruptedException("Cancelled")
             onProgress(i, chunks.size)
             val stream = rec.createStream()
             try {
-                stream.acceptWaveform(pcm.samples.copyOfRange(start, end), pcm.sampleRate)
+                stream.acceptWaveform(pcm.samples.copyOfRange(c.startSample, c.endSample), pcm.sampleRate)
                 rec.decode(stream)
-                val text = rec.getResult(stream).text.trim()
-                if (text.isNotEmpty()) parts.add(text)
+                texts.add(rec.getResult(stream).text.trim())
             } finally {
                 stream.release()
             }
         }
         onProgress(chunks.size, chunks.size)
-        return parts.joinToString(" ")
+        return texts
     }
 
+    /** Call after switching/removing the active model so a stale recognizer isn't reused. */
     @Synchronized
-    fun release() {
+    fun invalidate() {
         recognizer?.release()
         recognizer = null
         loadedKey = null
     }
 
-    /** Returns (startSample, endSampleExclusive) pairs. */
-    private fun split(x: FloatArray, sr: Int): List<Pair<Int, Int>> {
-        val maxLen = 28 * sr
-        val searchLen = 4 * sr
-        val frame = (0.02f * sr).toInt().coerceAtLeast(1)
-        val result = ArrayList<Pair<Int, Int>>()
-        var start = 0
-        while (start < x.size) {
-            if (x.size - start <= maxLen) { result.add(start to x.size); break }
-            val hardEnd = start + maxLen
-            var bestPos = hardEnd
-            var bestEnergy = Float.MAX_VALUE
-            var p = hardEnd - searchLen
-            while (p + frame <= hardEnd) {
-                var e = 0f
-                for (k in p until p + frame) e += abs(x[k])
-                if (e < bestEnergy) { bestEnergy = e; bestPos = p + frame / 2 }
-                p += frame
-            }
-            result.add(start to bestPos)
-            start = bestPos
-        }
-        return result
-    }
+    @Synchronized
+    fun release() = invalidate()
 }

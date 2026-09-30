@@ -16,6 +16,6 @@ Thumbs.db
 *.keystore
 keystore.properties
 
-# Built output — you'll attach APKs to GitHub Releases, not commit them
+# Built output — attach APKs to GitHub Releases, not the repo
 *.apk
 *.aab

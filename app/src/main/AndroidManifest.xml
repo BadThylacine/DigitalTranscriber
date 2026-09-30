@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Intentionally NO INTERNET permission: the app cannot reach the network. -->
+    <!--
+      INTERNET is used ONLY to download a Whisper model file the user explicitly
+      picks, from GitHub's sherpa-onnx release assets. Transcription/translation
+      itself runs fully on-device and makes no network calls.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="false"
