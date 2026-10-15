@@ -14,7 +14,8 @@ android {
         versionCode = 1
         versionName = "1.0"
         // Real phones are arm64; x86_64 is for the emulator. Remove it to shrink the APK.
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+//        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     buildTypes {
@@ -44,5 +45,5 @@ dependencies {
 
     // Used only to stream-extract the .tar.bz2 model archives downloaded in-app
     // (tar + bzip2 support; Android has neither built in).
-    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.apache.commons:commons-compress:1.28.0")
 }
